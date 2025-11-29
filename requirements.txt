@@ -1,0 +1,6 @@
+requests 
+packaging
+ijson
+aiohttp 
+aiofiles 
+aiosqlite

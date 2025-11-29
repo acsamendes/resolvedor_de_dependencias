@@ -1,0 +1,35 @@
+# --- BANCO DE DADOS (SQLite) ---
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignora arquivos temporários/journal do SQLite
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Mantém a pasta 'data' vazia no repositório
+!data/.gitkeep
+
+# --- PYTHON ---
+# Bytecode compilado
+__pycache__/
+*.pyc
+
+# Ambientes virtuais
+venv/
+env/
+.venv/
+
+# --- DOCKER & CONFIGURAÇÕES ---
+# Arquivos de variáveis de ambiente
+.env
+
+# Logs
+*.log
+
+# --- IDEs / SISTEMA OPERACIONAL ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
