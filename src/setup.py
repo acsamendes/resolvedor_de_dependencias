@@ -4,24 +4,26 @@ import sys
 import time
 import requests
 
+from db_client import DBClient
+
 # --- CONFIGURAÇÕES ---
 DB_URL = "https://github.com/pypi-data/pypi-json-data/releases/download/latest/pypi-data.sqlite.gz" 
 DB_PATH = os.path.join("data", "pypi-data.sqlite")
 
 # Colunas para remover
 DROP_COLUMNS = [
+    'id', 
     'description', 
     'summary', 
     'author', 
     'author_email', 
     'maintainer', 
     'maintainer_email', 
-    'keywords', 
-    'classifiers', 
+    'package_url', 
     'license', 
-    'docs_url', 
     'home_page',
-    'project_urls'
+    'project_url',
+    'plataform'
 ]
 
 def download_database(url, dest_path):
@@ -65,12 +67,9 @@ def get_connection():
     if not os.path.exists(DB_PATH):
         # Chama a função de download definida acima
         download_database(DB_URL, DB_PATH)
-        
-        # Opcional: Se precisar rodar o otimizador após baixar
-        # from src.database.optimizer import optimize_database
-        # optimize_database()
+    client = DBClient(DB_PATH)
+    return client.get_connection()
 
-    return sqlite3.connect(DB_PATH)
 
 def get_table_columns(cursor, table_name):
     """Retorna uma lista com os nomes das colunas de uma tabela."""
@@ -82,10 +81,11 @@ def get_table_columns(cursor, table_name):
 
 def clean_database():
     print(f"Iniciando limpeza do banco: {DB_PATH}")
-    print(f"Tamanho inicial: {os.path.getsize(DB_PATH) / (1024*1024):.2f} MB")
+    if os.path.exists(DB_PATH):
+        print(f"Tamanho inicial: {os.path.getsize(DB_PATH) / (1024*1024):.2f} MB")
     
     conn = get_connection()
-    conn.isolation_level = None  # Autocommit para operações de VACUUM
+    conn.isolation_level = None  # Autocommit ligado (necessário para VACUUM)
     cursor = conn.cursor()
 
     try:
@@ -94,11 +94,11 @@ def clean_database():
         print(f"Tabela 'urls' removida.")
 
         # 2. REMOÇÃO DE COLUNAS (DROP COLUMN)
-        # Nota: Suportado nativamente no SQLite a partir da versão 3.35+ (Python 3.8+)
-        print("\n--- Verificando colunas ---")
+        print("\n--- Verificando remoção de colunas ---")
         
         table = 'projects'
-        current_columns = get_table_columns(cursor, table)
+        # Função auxiliar que você já tem
+        current_columns = get_table_columns(cursor, table) 
         
         for col in DROP_COLUMNS:
             if col in current_columns:
@@ -108,22 +108,63 @@ def clean_database():
                 except sqlite3.OperationalError as e:
                     print(f"  Erro ao remover '{col}': {e}")
 
-        # Reescreve o banco do zero, removendo espaços vazios e desfragmentando.
+        # 3. SANITIZAÇÃO DE DADOS (Transformar '' e 'null' em NULL real)
+        print("\n--- Sanitizando dados ('' ou 'null' -> NULL) ---")
+        
+        # Iniciamos uma transação manual para performance, pois o autocommit está ligado
+        cursor.execute("BEGIN TRANSACTION") 
+        
+        updates_total = 0
+
+        tbl = 'projects'  # Foco apenas na tabela 'projects' para sanitização
+        print(f"Sanitizando tabela '{tbl}'...")
+        # Pega info atualizada das colunas (PRAGMA retorna: cid, name, type, notnull, dflt, pk)
+        cursor.execute(f"PRAGMA table_info({tbl})")
+        columns_info = cursor.fetchall()
+        
+        for col_info in columns_info:
+            # Se estiver usando row_factory, adapte os índices abaixo ou use chaves
+            col_name = col_info[1]  
+            is_not_null = col_info[3]
+            is_pk = col_info[5]
+
+            # Pula colunas que não aceitam NULL ou são Chave Primária
+            if is_pk or is_not_null:
+                continue
+
+            query = f"""
+                UPDATE "{tbl}"
+                SET "{col_name}" = NULL
+                WHERE "{col_name}" = '' 
+                    OR "{col_name}" IS 'null' 
+            """
+            cursor.execute(query)
+            if cursor.rowcount > 0:
+                print(f"  -> Tabela '{tbl}' | Coluna '{col_name}': {cursor.rowcount} corrigidos.")
+                updates_total += cursor.rowcount
+        
+        cursor.execute("COMMIT") # Salva todas as alterações de dados
+        print(f"Sanitização concluída. Total de células alteradas: {updates_total}")
+
+
+        # 4. VACUUM (Reescreve o banco do zero)
         print("\n--- Executando VACUUM (Isso pode demorar alguns minutos) ---")
         start_time = time.time()
         cursor.execute("VACUUM")
         end_time = time.time()
         
         print(f"VACUUM concluído em {end_time - start_time:.2f} segundos.")
+        
+        if os.path.exists(DB_PATH):
+            print(f"Tamanho final: {os.path.getsize(DB_PATH) / (1024*1024):.2f} MB")
 
     except Exception as e:
         print(f"Erro crítico durante a limpeza: {e}")
-    finally:
-        conn.close()
-
-    final_size = os.path.getsize(DB_PATH) / (1024*1024)
-    print(f"\Limpeza finalizada!")
-    print(f"Tamanho final: {final_size:.2f} MB")
+        # Tenta desfazer alterações de dados se der erro antes do commit
+        try:
+            cursor.execute("ROLLBACK")
+        except:
+            pass
 
 if __name__ == "__main__":
     clean_database()

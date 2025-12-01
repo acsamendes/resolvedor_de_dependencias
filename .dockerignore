@@ -1,0 +1,31 @@
+# --- Banco de Dados ---
+*.sqlite
+*.sqlite3
+
+# --- Controle de Versão ---
+.git
+.gitignore
+
+# --- Ambientes Virtuais e Dependências ---
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- IDE e Editor ---
+.vscode/
+.idea/
+*.swp
+
+# --- Arquivos do Sistema Operacional ---
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+docker-compose.yml
+Dockerfile
+.dockerignore
