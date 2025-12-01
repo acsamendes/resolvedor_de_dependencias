@@ -1,13 +1,17 @@
 import re
 from packaging.specifiers import SpecifierSet, InvalidSpecifier
-from packaging.version import Version, InvalidVersion
+
+
+
 
 class InputValidator:
+
     def __init__(self, db_client):
         """
         Inicializa o validador com uma instancia do cliente de banco de dados
         para verificar a existencia dos pacotes.
         """
+
         self.db_client = db_client
 
 
