@@ -2,9 +2,6 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version, InvalidVersion
 from packaging.requirements import Requirement
 
-
-
-
 class GraphBuilder:
 
     def __init__(self, db_client, python_version, max_versions_per_package=None):
@@ -24,8 +21,6 @@ class GraphBuilder:
 
         # Cria um objeto Version para comparações com marcadores de ambiente
         self.python_version_obj = Version(python_version) if python_version else None
-
-
 
     def get_candidate_versions(self, package_name, specifier_set=None):
         """
@@ -81,8 +76,6 @@ class GraphBuilder:
             candidates = candidates[:self.max_versions]
 
         return candidates
-
-
 
     def get_dependencies(self, package_name, version_str):
         """

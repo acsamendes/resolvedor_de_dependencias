@@ -1,9 +1,6 @@
 from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name
 
-
-
-
 class ConflictError(Exception):
     """
     Exceção personalizada para sinalizar falhas na resolução (Backtracking).
@@ -16,9 +13,6 @@ class ConflictError(Exception):
         self.constraint = constraint
         self.parent_error = parent_error
 
-
-
-
 class Resolver:
 
     def __init__(self, graph_builder):
@@ -26,8 +20,6 @@ class Resolver:
         self.gb = graph_builder
         # Estatísticas para debug e análise de performance
         self.stats = {"steps": 0, "backtracks": 0}
-
-
 
     def resolve(self, requirements_map):
         """
@@ -76,8 +68,6 @@ class Resolver:
                 },
                 "stats": self.stats
             }
-
-
 
     def _backtracking(self, assignments, constraints, todo_list):
         """
@@ -181,8 +171,6 @@ class Resolver:
             parent_error=last_error
         )
 
-
-
     def _select_mrv_package(self, todo_list, constraints):
         """
         Aplica a heurística MRV.
@@ -210,8 +198,6 @@ class Resolver:
                 best_pkg = package
                 
         return best_pkg
-
-
 
     def _topological_sort(self, assignments):
         """

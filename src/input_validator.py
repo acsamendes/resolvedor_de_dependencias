@@ -1,9 +1,6 @@
 import re
 from packaging.specifiers import SpecifierSet, InvalidSpecifier
 
-
-
-
 class InputValidator:
 
     def __init__(self, db_client):
@@ -13,8 +10,6 @@ class InputValidator:
         """
 
         self.db_client = db_client
-
-
 
     def validate(self, input_data):
         """
@@ -110,15 +105,11 @@ class InputValidator:
 
         return True, None
 
-
-
     def _is_valid_package_name(self, name):
         """
         Verifica se o nome do pacote segue regras básicas (alfanumérico, -, _, .).
         """
         return re.match(r'^[A-Za-z0-9_\-\.]+$', name) is not None
-
-
 
     def _is_valid_specifier(self, spec_str):
         """

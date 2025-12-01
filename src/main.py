@@ -10,12 +10,7 @@ from input_validator import InputValidator
 from graph_builder import GraphBuilder
 from resolver import Resolver
 
-
-
-
 DB_PATH = os.path.join("data", "pypi_data.sqlite")
-
-
 
 # Modelo Pydantic da requisição
 class ResolveRequest(BaseModel):
@@ -24,8 +19,6 @@ class ResolveRequest(BaseModel):
     wants: Optional[List[str]] = []
     max_versions: Optional[int] = 10 
 
-
-
 # Inicialização da Aplicação
 app = FastAPI(
     title="Python Dependency Resolver",
@@ -33,47 +26,31 @@ app = FastAPI(
     version="1.0.0"
 )
 
-
-
 # Singleton do Banco de Dados 
 _db_client: Optional[DBClient] = None
-
-
-
-
 
 @app.on_event("startup")
 def startup_event():
     """
-    Inicializa o banco de dados uma única vez ao iniciar o servidor.
+    Inicializa a instância do DBClient e verifica se o arquivo existe.
     """
-
     global _db_client
 
     if not os.path.exists(DB_PATH):
-        print(f'AVISO: Banco de dados "{DB_PATH}" não encontrado. As requisições podem falhar.')
+        print(f'AVISO CRÍTICO: Banco de dados "{DB_PATH}" não encontrado. As requisições irão falhar.')
+    else:
+        print(f'Banco de dados encontrado em: {DB_PATH}')
     
     _db_client = DBClient(DB_PATH)
-    print(f'Servidor iniciado. Banco de dados conectado em: {DB_PATH}')
-
-
-
+    print('Serviço de banco de dados configurado.')
 
 @app.on_event("shutdown")
 def shutdown_event():
     """
     Fecha a conexão ao parar o servidor.
     """
-
-    global _db_client
-
-    if _db_client:
-        _db_client.close_connection()
     
-    print('Conexão com banco de dados fechada.')
-
-
-
+    print('Encerrando aplicação...')
 
 def get_db() -> DBClient:
     """
@@ -85,9 +62,6 @@ def get_db() -> DBClient:
         raise HTTPException(status_code=500, detail="Serviço de banco de dados não inicializado.")
     
     return _db_client
-
-
-
 
 def prepare_requirements(input_data: dict) -> Dict[str, SpecifierSet]:
     """
@@ -117,8 +91,6 @@ def prepare_requirements(input_data: dict) -> Dict[str, SpecifierSet]:
 @app.get("/")
 def read_root():
     return {"message": "Dependency Resolver API is running. Use POST /resolve to solve dependencies."}
-
-
 
 
 @app.post("/resolve")
