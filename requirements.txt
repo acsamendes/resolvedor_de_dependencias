@@ -4,3 +4,5 @@ ijson
 aiohttp 
 aiofiles 
 aiosqlite
+fastapi
+uvicorn
