@@ -1,5 +1,8 @@
+import logging
 import re
 from packaging.specifiers import SpecifierSet, InvalidSpecifier
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 class InputValidator:
 
@@ -28,7 +31,7 @@ class InputValidator:
 
 
         # Chaves permitidas
-        allowed_keys = {'python', 'fixed', 'wants', 'options'}
+        allowed_keys = {'python', 'fixed', 'wants', 'max_versions'}
         unknown_keys = set(input_data.keys()) - allowed_keys
         if unknown_keys:
             return False, f'Chaves desconhecidas encontradas no input: {unknown_keys}.'
@@ -77,13 +80,15 @@ class InputValidator:
 
             if not isinstance(wants_deps, list):
                 return False, 'O campo "wants" deve ser uma lista de strings.'
+            
+            logging.info(f'Validating wants: {wants_deps}')
 
             for item in wants_deps:
 
                 if not isinstance(item, str):
                     return False, 'Os itens em "wants" devem ser nomes de pacotes (strings).'
 
-                package_name = item.strip()
+                package_name = item
                 
                 if not self._is_valid_package_name(package_name):
                     return False, f'Nome de pacote inválido em "wants": "{package_name}".'

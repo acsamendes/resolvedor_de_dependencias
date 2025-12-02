@@ -1,8 +1,9 @@
+import json
+import logging
 import os
 import uvicorn
 from typing import Dict, List, Optional
-from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Depends, Form
 from packaging.specifiers import SpecifierSet
 
 from db_client import DBClient
@@ -10,14 +11,10 @@ from input_validator import InputValidator
 from graph_builder import GraphBuilder
 from resolver import Resolver
 
-DB_PATH = os.path.join("data", "pypi_data.sqlite")
+DB_PATH = os.path.join("data", "pypi-data.sqlite")
 
-# Modelo Pydantic da requisição
-class ResolveRequest(BaseModel):
-    python: Optional[str] = None
-    fixed: Optional[Dict[str, str]] = None
-    wants: Optional[List[str]] = []
-    max_versions: Optional[int] = 10 
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
 
 # Inicialização da Aplicação
 app = FastAPI(
@@ -82,6 +79,8 @@ def prepare_requirements(input_data: dict) -> Dict[str, SpecifierSet]:
             if pkg not in requirements:
                 requirements[pkg] = SpecifierSet("")
                 
+    print(f'Prepared requirements: {requirements}')
+                
     return requirements
 
 
@@ -94,30 +93,61 @@ def read_root():
 
 
 @app.post("/resolve")
-def resolve_dependencies(request: ResolveRequest, db_client: DBClient = Depends(get_db)):
+def resolve_dependencies(
+        # Parâmetros definidos como Form aparecem como caixas de texto no Swagger
+        python: Optional[str] = Form(None, description="Versão do Python (ex: 3.10)"),
+        wants: Optional[List[str]] = Form(None, description="Lista de pacotes desejados"),
+        fixed: Optional[str] = Form(None, description='JSON String para versões fixas. Ex: {"pandas": "==1.3.0"}'),
+        max_versions: int = Form(10, description="Limite de versões por pacote"),
+        db_client: DBClient = Depends(get_db)
+                         ):
     """
     Endpoint principal.
     A injeção 'db_client: DBClient = Depends(get_db)' garante a instância correta do banco de dados será recebida automaticamente.
     """
 
-    # Converte Pydantic para dict
-    input_data = request.model_dump(exclude_none=True)
+    # 1. Processamento do campo 'fixed' 
+    fixed_dict = {}
+    if fixed:
+        try:
+            # Tenta converter a string de entrada em um dicionário
+            fixed_dict = json.loads(fixed)
+            if not isinstance(fixed_dict, dict):
+                raise ValueError
+        except (json.JSONDecodeError, ValueError):
+            raise HTTPException(status_code=400, detail="O campo 'fixed' deve ser um JSON válido (ex: {\"pkg\": \"==1.0\"}).")
+
+    logging.info(f'Input wants: {wants}\n Type: {type(wants)}')
     
-    # Validação Lógica
+    final_wants = []
+    
+    if wants:
+        for item in wants:
+            # Se o item contiver vírgula, quebra ele. Se não, mantém.
+            if "," in item:
+                final_wants.extend([x.strip() for x in item.split(",")])
+            else:
+                final_wants.append(item.strip())
+    
+    logging.info(f'Output wants: {final_wants}\n Type: {type(final_wants)}')
+    
+    # 2. Montagem do JSON 
+    input_data = {
+        "python": python,
+        "fixed": fixed_dict,
+        "wants": final_wants if final_wants else [],
+        "max_versions": max_versions
+    }
+
     validator = InputValidator(db_client)
     is_valid, error_msg = validator.validate(input_data)
     
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_msg)
-
-
-    # Configuração
-    python_version = input_data.get("python")
-    max_versions = input_data.get("max_versions", None)
     
     gb = GraphBuilder(
         db_client=db_client,
-        python_version=python_version,
+        python_version=python,
         max_versions_per_package=max_versions
     )
     
@@ -127,18 +157,15 @@ def resolve_dependencies(request: ResolveRequest, db_client: DBClient = Depends(
     try:
         reqs_map = prepare_requirements(input_data)
         
-        print(f'Resolvendo para Python: {python_version}, Alvos: {list(reqs_map.keys())}')
+        print(f'Resolvendo para Python: {python}, Alvos: {list(reqs_map.keys())}')
         
         result = resolver.resolve(reqs_map)
 
         return result
 
     except Exception as e:
-
         import traceback
-
         traceback.print_exc()
-
         raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
 
 

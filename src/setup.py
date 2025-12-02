@@ -4,7 +4,7 @@ import sys
 import time
 import requests
 
-from db_client import DBClient
+from resolvedor_de_dependencias.src.db_client import DBClient
 
 # --- CONFIGURAÇÕES ---
 DB_URL = "https://github.com/pypi-data/pypi-json-data/releases/download/latest/pypi-data.sqlite.gz" 

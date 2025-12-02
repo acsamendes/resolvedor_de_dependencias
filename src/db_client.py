@@ -13,10 +13,34 @@ class DBClient:
         self.table_name = "projects"
 
     def get_connection(self):
-        """Cria uma conexão com row_factory para facilitar o acesso."""
+        """
+        Cria uma conexão com row_factory e registra a função de versão.
+        """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
+        
+        # REGISTRO DA FUNÇÃO: Permite usar version_match(ver, spec) no SQL
+        conn.create_function("version_match", 2, self._sql_version_match)
+        
         return conn
+
+    @staticmethod
+    def _sql_version_match(version, specifier):
+        """
+        Função auxiliar executada pelo SQLite.
+        Retorna 1 se a versão atende ao specifier, 0 caso contrário.
+        """
+        if not specifier or specifier == "":
+            return 1 # Sem restrição = compatível
+        if not version:
+            return 0 
+            
+        try:
+            v = Version(str(version))
+            spec = SpecifierSet(str(specifier))
+            return 1 if v in spec else 0
+        except (InvalidVersion, ValueError):
+            return 0
 
     def get_available_versions(self, package):
         """
@@ -28,15 +52,11 @@ class DBClient:
             cursor = conn.cursor()
             cursor.execute(query, (package,))
             rows = cursor.fetchall()
-            
-            # Retorna uma lista simples de strings
             return [row['version'] for row in rows]
 
     def get_dependencies(self, package, version):
         """
         Retorna a lista de dependências (requires_dist) de um pacote específico.
-        Assume que a coluna 'requires_dist' armazena 
-        JSON ou string.
         """
         query = f"SELECT requires_dist FROM {self.table_name} WHERE name = ? AND version = ?"
         
@@ -47,17 +67,15 @@ class DBClient:
             
             if row and row['requires_dist']:
                 try:
-                    # Tenta carregar como JSON (comum em dumps do PyPI)
                     return json.loads(row['requires_dist'])
                 except json.JSONDecodeError:
-                    # Se não for JSON, retorna o texto cru ou trata como lista unitária
                     return [row['requires_dist']]
             return []
 
     def version_satisfies(self, version, specifier):
         """
-        Verifica se uma versão atende a um especificador (ex: '>=1.0,~=1.5').
-        Não acessa o banco, é uma função lógica utilitária.
+        Verifica se uma versão atende a um especificador.
+        Mantida como utilitário para uso fora de queries.
         """
         try:
             v = Version(version)
@@ -69,34 +87,55 @@ class DBClient:
 
     def package_and_version_exists(self, package, version):
         """
-        Verifica se o par pacote e versão existe no banco.
+        Verifica se existe pelo menos uma versão no banco que atenda ao especificador passado.
+        
+        Args:
+            package: Nome do pacote.
+            version: Agora atua como SPECIFIER (ex: "==1.0", ">=2.0").
         """
-        # lança o valor 1 para todas as linhas que correspondem aos valores buscados
-        query = f"SELECT 1 FROM {self.table_name} WHERE name = ? AND version = ? LIMIT 1"
+        # A query verifica:
+        # 1. Se o nome do pacote bate
+        # 2. Se a versão salva no banco (coluna version) satisfaz o specifier passado 
+        query = f"""
+            SELECT 1 
+            FROM {self.table_name} 
+            WHERE name = ? 
+            AND version_match(version, ?) 
+            LIMIT 1
+        """
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (package, version))
-            # Se fetchone retornar algo, ou seja, existe pelo menos uma linha em que o par existe
             return cursor.fetchone() is not None
 
     def python_version_satisfies_package(self, package, version, python_version):
         """
         Verifica se uma versão específica do Python é compatível
-        com o 'requires_python' definido no pacote.
+        com o 'requires_python' definido no pacote, usando lógica SQL.
         """
-        query = f"SELECT requires_python FROM {self.table_name} WHERE name = ? AND version = ?"
+        # A query agora calcula a compatibilidade diretamente no banco.
+        # CASE WHEN verifica: Se for nulo/vazio -> 1 (True), senão usa a função customizada.
+        query = f"""
+            SELECT 
+                CASE 
+                    WHEN requires_python IS NULL THEN 1 
+                    ELSE version_match(?, requires_python) 
+                END as is_compatible
+            FROM {self.table_name} 
+            WHERE name = ? AND version = ?
+        """
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, (package, version))
+            # Note a ordem dos parâmetros: python_version primeiro (para o version_match), depois name e version
+            cursor.execute(query, (python_version, package, version))
             row = cursor.fetchone()
             
-            # Se o pacote não especifica python, assume-se que roda em qualquer um
-            if not row or not row['requires_python']:
+            # Mantendo a lógica original: 
+            # Se o pacote não existe (row is None), retorna True
+            if row is None:
                 return True
             
-            requires_python = row['requires_python']
-            
-            # Reutiliza a lógica de specifiers
-            return self.version_satisfies(python_version, requires_python)
+            # Retorna o resultado booleano calculado pelo SQLite (0 ou 1)
+            return bool(row['is_compatible'])
