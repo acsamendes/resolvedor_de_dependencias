@@ -14,6 +14,7 @@ Quando não há solução, fornece um diagnóstico completo do conflito, incluin
 
 Trabalho Final da Disciplina de AED2 com aplicação de Grafos. 
 
-##Instalção
+## Instalação
+
 
 
