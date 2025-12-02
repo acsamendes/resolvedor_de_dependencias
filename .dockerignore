@@ -1,4 +1,6 @@
 # --- Banco de Dados ---
+data/
+pypi_data.sqlite
 *.sqlite
 *.sqlite3
 
@@ -28,4 +30,3 @@ Thumbs.db
 # --- Docker ---
 docker-compose.yml
 Dockerfile
-.dockerignore
