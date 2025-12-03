@@ -1,8 +1,12 @@
-import logging
 import re
+import logging
+from packaging.utils import canonicalize_name
 from packaging.specifiers import SpecifierSet, InvalidSpecifier
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+
+
 
 class InputValidator:
 
@@ -13,6 +17,8 @@ class InputValidator:
         """
 
         self.db_client = db_client
+
+
 
     def validate(self, input_data):
         """
@@ -27,14 +33,29 @@ class InputValidator:
         
         # Validação Estrutural Básica
         if not isinstance(input_data, dict):
-            return False, 'O input deve ser um objeto JSON (dicionário).'
+            logging.info('Ocorreu um erro na validação das entradas.')
+            return False, 'Ocorreu um erro na validação das entradas.'
 
 
         # Chaves permitidas
         allowed_keys = {'python', 'fixed', 'wants', 'max_versions'}
         unknown_keys = set(input_data.keys()) - allowed_keys
         if unknown_keys:
+            logging.info(f'Chaves desconhecidas encontradas no input: {unknown_keys}.')
             return False, f'Chaves desconhecidas encontradas no input: {unknown_keys}.'
+
+
+        # Verificação de segurança e normalização de nomes
+        if 'fixed' in input_data and 'wants' in input_data:
+            # Normaliza as chaves 
+            fixed_keys = {canonicalize_name(k) for k in input_data['fixed'].keys()}
+            wants_set = {canonicalize_name(k) for k in input_data['wants']}
+
+            intersection = fixed_keys.intersection(wants_set)
+
+            if intersection:
+                logging.info(f'Pacotes não podem estar em "fixed" e "wants" simultaneamente: {intersection}.')
+                return False, f'Pacotes não podem estar em "fixed" e "wants" simultaneamente: {intersection}.'
 
 
         # Validação da Versão do Python
@@ -43,78 +64,83 @@ class InputValidator:
             python_version = input_data['python']
 
             if not isinstance(python_version, str):
-                return False, 'O campo "python" deve ser uma string (ex: "3.10").'
+                logging.info('O campo "python" não foi preenchido corretamente.')
+                return False, 'O campo "python" deve ser uma string, por exemplo: "3.10".'
             
             # Validação simples de formato X.Y ou X.Y.Z
             if not re.match(r'^\d+\.\d+(\.\d+)?$', python_version):
+                logging.info(f'Formato de versão Python inválido: "{python_version}".')
                 return False, f'Formato de versão Python inválido: "{python_version}". Use X.Y ou X.Y.Z.'
 
 
         # Validação de Pacotes Fixos ('fixed')
         if 'fixed' in input_data:
 
-            fixed_deps = input_data['fixed']
+            raw_fixed_deps = input_data['fixed']
 
-            if not isinstance(fixed_deps, dict):
+            if not isinstance(raw_fixed_deps, dict):
+                logging.info('O campo "fixed" não foi preenchido corretamente.')
                 return False, 'O campo "fixed" deve ser um dicionário {"pacote": "versão"}.'
 
-            for package, version_spec in fixed_deps.items():
+            fixed_deps = {}
+            for package, version_spec in raw_fixed_deps.items():
+
+                norm_name = canonicalize_name(package)
 
                 # Valida nome do pacote
-                if not self._is_valid_package_name(package):
+                if not self._is_valid_package_name(norm_name):
+                    logging.info(f'Nome de pacote inválido em "fixed": "{package}".')
                     return False, f'Nome de pacote inválido em "fixed": "{package}".'
 
                 # Valida sintaxe do especificador (ex: ">=1.0,<=2.0") antes de chamar o banco
                 if not self._is_valid_specifier(version_spec):
+                    logging.info(f'Especificador de versão inválido para "{package}": "{version_spec}".')
                     return False, f'Especificador de versão inválido para "{package}": "{version_spec}".'
 
                 # Valida existência no DB passando o nome e a versão/restrição
-                if not self.db_client.package_and_version_exists(package, version_spec):
+                if not self.db_client.package_and_version_exists(norm_name, version_spec):
+                    logging.info(f'O pacote "{package}" com a versão/restrição "{version_spec}" não foi encontrado ou não é válido no banco de dados.')
                     return False, f'O pacote "{package}" com a versão/restrição "{version_spec}" não foi encontrado ou não é válido no banco de dados.'
 
 
         # Validação de Pacotes Desejados ('wants')
         if 'wants' in input_data:
 
-            wants_deps = input_data['wants']
+            raw_wants_deps = input_data['wants']
 
-            if not isinstance(wants_deps, list):
+            if not isinstance(raw_wants_deps, list):
+                logging.info('O campo "wants" não foi preenchido corretamente.')
                 return False, 'O campo "wants" deve ser uma lista de strings.'
             
-            logging.info(f'Validating wants: {wants_deps}')
+            logging.info(f'Validating wants: {raw_wants_deps}')
 
-            for item in wants_deps:
+            for item in raw_wants_deps:
 
                 if not isinstance(item, str):
+                    logging.info('Itens inválidos encontrados em "wants".')
                     return False, 'Os itens em "wants" devem ser nomes de pacotes (strings).'
 
                 package_name = item
                 
                 if not self._is_valid_package_name(package_name):
+                    logging.info(f'Nome de pacote inválido em "wants": "{package_name}".')
                     return False, f'Nome de pacote inválido em "wants": "{package_name}".'
 
                 if not self.db_client.package_and_version_exists(package_name, None):
+                    logging.info(f'O pacote "{package_name}" listado em "wants" não foi encontrado no banco de dados.')
                     return False, f'O pacote "{package_name}" listado em "wants" não foi encontrado no banco de dados.'
 
-
-        # Verifica se um pacote está em 'fixed' E em 'wants' ao mesmo tempo (o que seria redundante ou conflitante)
-        if 'fixed' in input_data and 'wants' in input_data:
-
-            fixed_keys = set(input_data['fixed'].keys())
-            wants_set = set(input_data['wants'])
-
-            intersection = fixed_keys.intersection(wants_set)
-
-            if intersection:
-                return False, f'Pacotes não podem estar em "fixed" e "wants" simultaneamente: {intersection}.'
-
         return True, None
+
+
 
     def _is_valid_package_name(self, name):
         """
         Verifica se o nome do pacote segue regras básicas (alfanumérico, -, _, .).
         """
         return re.match(r'^[A-Za-z0-9_\-\.]+$', name) is not None
+
+
 
     def _is_valid_specifier(self, spec_str):
         """

@@ -1,7 +1,7 @@
 services:
   app_interface:
     build: .
-    container_name: python_dependency_manager
+    container_name: python_dependency_resolver
     ports:
       - "8000:8000"
 
