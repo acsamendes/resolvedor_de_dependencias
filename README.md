@@ -26,7 +26,7 @@ Para executar o projeto, você pode escolher entre utilizar uma base de dados pr
 
 **Opção A: Execução Rápida (Recomendado)**
 Se deseja iniciar a aplicação rapidamente, baixe a base de dados pré-processada:
-1. Faça o download do arquivo `.zip` através deste link: **[INSERIR LINK DO DRIVE AQUI]**
+1. Faça o download do arquivo `.zip` através deste link: [LINK DO DRIVE](https://drive.google.com/file/d/1T1WzNvzJyqBZuJnS4jZLl7A-I7siFdjE/view?usp=sharing)
 2. Extraia o arquivo `.sqlite` contido no zip.
 3. Mova o arquivo extraído para a pasta `data` dentro do diretório do projeto.
    > **Atenção:** Mantenha exatamente o mesmo nome do arquivo `.sqlite` extraído.
@@ -43,6 +43,15 @@ Certifique-se de que o **Docker Desktop** esteja instalado e em execução na su
 1. No seu terminal (ambiente), execute o comando para construir e subir os containers:
    ```bash
    docker-compose up --build
+
+**Exemplo:**
+
+## Links úteis
+* [Dataset PyPI](https://github.com/pypi-data/pypi-json-data/tree/main?tab=readme-ov-file)
+* [Documentação PyPI](https://pypi.org/)
+* [Tutorial sobre ambientes virtuais Python](https://docs.python.org/3/tutorial/venv.html)
+
+
 
 
 
