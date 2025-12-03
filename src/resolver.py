@@ -1,5 +1,11 @@
+import logging
 from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name
+    
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+
+
 
 class ConflictError(Exception):
     """
@@ -13,6 +19,9 @@ class ConflictError(Exception):
         self.constraint = constraint
         self.parent_error = parent_error
 
+
+
+
 class Resolver:
 
     def __init__(self, graph_builder):
@@ -20,6 +29,8 @@ class Resolver:
         self.gb = graph_builder
         # Estatísticas para debug e análise de performance
         self.stats = {"steps": 0, "backtracks": 0}
+
+
 
     def resolve(self, requirements_map):
         """
@@ -69,6 +80,8 @@ class Resolver:
                 "stats": self.stats
             }
 
+
+
     def _backtracking(self, assignments, constraints, todo_list):
         """
         Núcleo recursivo do resolvedor.
@@ -78,11 +91,13 @@ class Resolver:
         
         # Se não há mais pacotes na lista 'todo', uma solução válida foi encontrada
         if not todo_list:
+            logging.info(f"Solução encontrada com {len(assignments)} pacotes após {self.stats['steps']} passos e {self.stats['backtracks']} backtracks.")
             return assignments
 
 
         # Escolha de qual pacote resolver agora
         package_to_solve = self._select_mrv_package(todo_list, constraints)
+        logging.info(f"Resolvendo '{package_to_solve}' com restrição '{constraints[package_to_solve]}'")
         
         # Remove o pacote escolhido da lista de pendências para a próxima iteração
         new_todo_list = [package for package in todo_list if package != package_to_solve]
@@ -125,7 +140,7 @@ class Resolver:
 
                         assigned_ver = assignments[dependency_name]['version_obj']
 
-                        if not new_spec.contains(assigned_ver, prereleases=False):
+                        if not new_spec.contains(assigned_ver, prereleases=True):
 
                             raise ConflictError(
                                 f"Conflito: {package_to_solve} {version_str} requer {dependency_name}{new_spec}, mas {dependency_name} já foi fixado em {assigned_ver}."
@@ -171,6 +186,8 @@ class Resolver:
             parent_error=last_error
         )
 
+
+
     def _select_mrv_package(self, todo_list, constraints):
         """
         Aplica a heurística MRV.
@@ -198,6 +215,8 @@ class Resolver:
                 best_pkg = package
                 
         return best_pkg
+
+
 
     def _topological_sort(self, assignments):
         """
@@ -254,6 +273,8 @@ class Resolver:
             
         return order
 
+
+
     def _format_solution(self, assignments):
         """
         Formata a solução aplicando a ordenação topológica.
@@ -272,7 +293,6 @@ class Resolver:
                 "package": package_name,
                 "version": data['version_str'],
                 "yanked": data['is_yanked'],
-                "vulnerabilities": data['vulnerabilities']
             })
 
         return plan

@@ -1,6 +1,13 @@
+import logging
 from packaging.specifiers import SpecifierSet
-from packaging.version import Version, InvalidVersion
+from packaging.utils import canonicalize_name
 from packaging.requirements import Requirement
+from packaging.version import Version, InvalidVersion
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+
+
 
 class GraphBuilder:
 
@@ -22,6 +29,8 @@ class GraphBuilder:
         # Cria um objeto Version para comparações com marcadores de ambiente
         self.python_version_obj = Version(python_version) if python_version else None
 
+
+
     def get_candidate_versions(self, package_name, specifier_set=None):
         """
         Busca versões disponíveis, aplica filtros (Python, Specifier) e ordenação heurística.
@@ -34,42 +43,41 @@ class GraphBuilder:
         if specifier_set is None:
             specifier_set = SpecifierSet("")
 
-        for version_str in raw_versions:
+        for version in raw_versions:
 
             try:
-                version_obj = Version(version_str)
+                version_obj = Version(version)
 
             except InvalidVersion:
+                logging.info(f"Versão inválida ignorada no banco: {version} do pacote {package_name}.")
                 continue
 
             # Filtro: Specifier
-            if not specifier_set.contains(version_obj, prereleases=False):
+            if not specifier_set.contains(version_obj, prereleases=True):
+                logging.info(f"Rejeitado: {version_obj} | É Prerelease? {version_obj.is_prerelease} | Spec: {specifier_set}")
                 continue
 
             # Filtro: Compatibilidade com Python
             # Se python_version for None, aceita qualquer versão do pacote
             if self.python_version:
-                if not self.db.python_version_satisfies_package(package_name, version_str, self.python_version):
+                if not self.db.python_version_satisfies_package(package_name, version, self.python_version):
+                    logging.info(f'Versão Python do pacote "{package_name}" na versão "{version}" não é compatível com Python {self.python_version}.')
                     continue
 
             # Metadados
-            metadata = self.db.get_metadata(package_name, version_str)
-            is_yanked = metadata.get('yanked', False)
-            vulnerabilities = metadata.get('vulnerabilities', [])
+            is_yanked = self.db.is_yanked(package_name, version)
 
             candidate = {
                 'package': package_name,
                 'version_obj': version_obj,
-                'version_str': version_str,
+                'version': version,
                 'is_yanked': bool(is_yanked),
-                'vulnerabilities': len(vulnerabilities),
-                'raw_metadata': metadata
             }
             candidates.append(candidate)
 
         # Ordenação
         candidates.sort(key=lambda x: x['version_obj'], reverse=True)
-        candidates.sort(key=lambda x: (x['is_yanked'], x['vulnerabilities'] > 0))
+        candidates.sort(key=lambda x: x['is_yanked'])
 
         # Poda pela quantidade máxima de versões definida
         if self.max_versions and len(candidates) > self.max_versions:
@@ -77,13 +85,16 @@ class GraphBuilder:
 
         return candidates
 
-    def get_dependencies(self, package_name, version_str):
+
+
+    def get_dependencies(self, package_name, version):
         """
         Retorna as dependências de um pacote.
         Filtra apenas por versão do Python se ela estiver definida.
         """
 
-        raw_deps_list = self.db.get_dependencies(package_name, version_str)
+        raw_deps_list = self.db.get_dependencies(package_name, version)
+        logging.info(f'Obtidas dependências brutas para "{package_name}" na versão "{version}": {raw_deps_list}')
         cleaned_deps = []
 
         # Configura marcador para versão do Python
@@ -103,19 +114,22 @@ class GraphBuilder:
                     # CASO 1: A versão do Python está definida 
                     if self.python_version:
 
-                        # Avaliamos o marcador com a versão do Python fornecida
+                        # O marcador com a versão do Python fornecida é avaliado
                         if not req.marker.evaluate(env_markers):
+                            logging.info(f'Dependência rejeitada: "{raw_dep}". Motivo: Marcador "{req.marker}" falhou para o ambiente "{env_markers}".')
                             continue # Marcador falhou (ex: versão python incompatível), descarta
                     
                     # CASO 2: Python indefinido (Modo Universal)
                     else:
                         # Se não há a versão do Python definida, não é possível julgar marcadores de versão
+                        logging.info(f'Versão do Python não definida. Aceitando dependência "{raw_dep}" do pacote "{package_name}" na versão "{version}".')
                         pass
 
-                cleaned_deps.append((req.name, req.specifier))
+                cleaned_deps.append((canonicalize_name(req.name), req.specifier))
 
-            except Exception:
+            except Exception as e:
                 # Se falhar o parse, ignora a dependência por segurança
+                logging.error(f"ERRO DE PARSE: Não foi possível processar a dependência '{raw_dep}' do pacote '{package_name}'. Erro: '{e}'.")
                 continue
 
         return cleaned_deps
