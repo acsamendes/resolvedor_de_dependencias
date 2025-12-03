@@ -57,5 +57,3 @@ Certifique-se de que o **Docker Desktop** esteja instalado e em execução na su
 
 
 
-
-

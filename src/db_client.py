@@ -139,3 +139,30 @@ class DBClient:
             
             # Retorna o resultado booleano calculado pelo SQLite (0 ou 1)
             return bool(row['is_compatible'])
+    
+    def is_yanked(self, package, version):
+        """
+        Verifica se uma versão específica de um pacote foi 'yanked' (marcada como descontinuada/removida).
+        
+        Args:
+            package: Nome do pacote.
+            version: Versão EXATA (string, ex: "1.2.0"). Não use specifiers aqui.
+        :return: True se foi yanked, False caso contrário (ou se o pacote não existir).
+        """
+        # Verifica a coluna 'yanked'. 
+        # Se sua coluna tiver outro nome (ex: 'yanked_reason'), ajuste a query abaixo.
+        query = f"SELECT yanked FROM {self.table_name} WHERE name = ? AND version = ?"
+        
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (package, version))
+            row = cursor.fetchone()
+            
+            if row:
+                val = row['yanked']
+                
+                if val:
+                    return bool(val)
+                else:
+                    # Se o pacote/versão não existe
+                    return False

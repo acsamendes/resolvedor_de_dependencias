@@ -142,6 +142,13 @@ def clean_database():
             if cursor.rowcount > 0:
                 print(f"  -> Tabela '{tbl}' | Coluna '{col_name}': {cursor.rowcount} corrigidos.")
                 updates_total += cursor.rowcount
+                
+        print(f"Criando coluna 'name_lower' na tabela '{table}'...")
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN name_lower TEXT")
+        
+        print("Populando 'name_lower' com valores minúsculos...")
+        # Copia name -> name_lower aplicando a função LOWER do SQLite
+        cursor.execute(f"UPDATE {table} SET name_lower = LOWER(name)")
         
         cursor.execute("COMMIT") # Salva todas as alterações de dados
         print(f"Sanitização concluída. Total de células alteradas: {updates_total}")
