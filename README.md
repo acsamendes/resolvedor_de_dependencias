@@ -58,6 +58,9 @@ Caso opte por não baixar o arquivo `.zip`, a aplicação executará automaticam
 * O sistema fará a busca e limpeza dos dados diretamente da fonte.
 * **Aviso:** Este processo leva em média **22 minutos** para ser concluído.
 
+Aqui está o Markdown bruto corrigido, com a formatação da lista e do bloco de código ajustada:
+
+````markdown
 ### 2. Executando a Aplicação
 
 Certifique-se de que o **Docker Desktop** esteja instalado e em execução na sua máquina.
@@ -72,4 +75,6 @@ Certifique-se de que o **Docker Desktop** esteja instalado e em execução na su
   * [Dataset PyPI](https://github.com/pypi-data/pypi-json-data/tree/main?tab=readme-ov-file)
   * [Documentação PyPI](https://pypi.org/)
   * [Tutorial sobre ambientes virtuais Python](https://docs.python.org/3/tutorial/venv.html)
+
 <!-- end list -->
+
