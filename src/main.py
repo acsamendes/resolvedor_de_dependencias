@@ -97,9 +97,9 @@ def prepare_requirements(input_data: dict) -> Dict[str, SpecifierSet]:
         for pkg in input_data['wants']:
 
             if pkg not in requirements:
-                requirements[pkg] = SpecifierSet("")
+                requirements[pkg] = SpecifierSet("")     
                 
-    logging.info(f'Prepared requirements: {requirements}')
+    logging.info(f'Requisitos definidos: {requirements}')
                 
     return requirements
 
@@ -108,24 +108,48 @@ def prepare_requirements(input_data: dict) -> Dict[str, SpecifierSet]:
 
 # ENDPOINTS
 
-@app.get("/")
+@app.get(
+        "/",
+        tags=["Default"],
+        summary="Verifica se a API está em execução.",
+        description="Endpoint raiz para verificar o status da API."
+        )
 def read_root():
     return {"message": "Dependency Resolver API is running. Use POST /resolve to solve dependencies."}
 
 
 
 
-@app.post("/resolve")
+@app.post(
+        "/resolve",
+        tags=["Dependency Resolution"],
+        summary="Resolve dependências para os pacotes Python solicitados.",
+        description="""
+        Resolve dependências para os pacotes Python solicitados, considerando versões fixas e restrições.
+        Utiliza backtracking e heurísticas para encontrar uma solução viável.
+        
+        Obs.: Adicione o valor do campo 'python' entre aspas para que seja interpretado como string.
+        """
+        )
 def resolve_dependencies(
-        # Parâmetros definidos como Form aparecem como caixas de texto no Swagger
-        python: Optional[str] = Form('"3.10"', description="Versão do Python."),
-        wants: Optional[List[str]] = Form('["mcp"]', description='Lista de pacotes desejados. Ex: "mcp"'),
-        fixed: Optional[str] = Form('{"numpy": ">=1.0"}', description='JSON contendo os pacotes e versões fixas. Ex: {"numpy": ">=1.0"}'),
-        max_versions: int = Form(10, description="Limite de versões por pacote durante as buscas."),
+        python: str = Form(..., description='Versão do Python. Ex.: "3.10". Obs.: Adicione o valor entre aspas.'),
+        wants: List[str] = Form(..., description='Lista de pacotes desejados. Ex: "mcp".'),
+        fixed: Optional[str] = Form(None, description='Dicionário contendo os pacotes e versões fixas. Ex: {"numpy": ">=1.0"}.'),
+        max_versions: Optional[int] = Form(None, description="Limite de versões por pacote durante as buscas."),
         db_client: DBClient = Depends(get_db)):
     """
     Endpoint principal para resolver dependências.
+
     """
+
+    # Validação do campo 'python'
+    if not python or not python.strip():
+        logging.error("O campo 'python' é obrigatório e não pode ser vazio.")
+        raise HTTPException(
+            status_code=400, 
+            detail="O campo 'python' é obrigatório e não pode ser vazio. Exemplo: '3.10'"
+        )
+
 
     # Processamento do campo 'fixed' 
     fixed_dict = {}
@@ -138,13 +162,12 @@ def resolve_dependencies(
                 raise ValueError
             
         except (json.JSONDecodeError, ValueError):
-            logging.error("Erro ao processar o campo 'fixed'.")
-            raise HTTPException(status_code=400, detail='O campo "fixed" deve ser um JSON válido (ex: {"pkg": "==1.0"}).')
+            logging.error('Erro ao processar o campo "fixed".')
+            raise HTTPException(status_code=400, detail='O campo "fixed" deve ser um dicionário válido (ex: {"pkg": "==1.0"}).')
     
 
     # Processamento do campo 'wants' 
     final_wants = []
-    
     if wants:
         for item in wants:
             # Se o item contiver vírgula, quebra ele. Se não, mantém.
@@ -153,7 +176,12 @@ def resolve_dependencies(
                 final_wants.extend(parts)
             elif item.strip():
                 final_wants.append(item.strip())
-    
+
+    else:
+        logging.error('O campo "wants" é obrigatório e deve conter ao menos um pacote.')
+        raise HTTPException(status_code=400, detail='O campo "wants" é obrigatório e deve conter ao menos um pacote.')
+
+
     # Montagem do JSON 
     input_data = {
         "python": python,
@@ -181,7 +209,7 @@ def resolve_dependencies(
     # Execução
     try:
         reqs_map = prepare_requirements(input_data)
-        logging.info(f'Resolvendo para Python: {python}, Alvos: {list(reqs_map.keys())}')
+        logging.info(f'Resolvendo para Python: {python}, alvos: {list(reqs_map.keys())}.')
         result = resolver.resolve(reqs_map)
 
         return result

@@ -62,18 +62,19 @@ class InputValidator:
         # Validação da Versão do Python
         if 'python' in input_data:
 
-            logging.info('Validando versão do Python.')
-
             python_version = input_data['python']
 
-            if not isinstance(python_version, str):
-                logging.info('O campo "python" não foi preenchido corretamente.')
-                return False, 'O campo "python" deve ser uma string, por exemplo: "3.10".'
-            
-            # Validação simples de formato X.Y ou X.Y.Z
-            if not re.match(r'^\d+\.\d+(\.\d+)?$', python_version):
-                logging.info(f'Formato de versão Python inválido: "{python_version}".')
-                return False, f'Formato de versão Python inválido: "{python_version}". Use X.Y ou X.Y.Z.'
+            if python_version is not None:
+                logging.info(f'Validando versão do Python: {python_version}.')
+
+                if not isinstance(python_version, str):
+                    logging.info('O campo "python" não foi preenchido corretamente.')
+                    return False, 'O campo "python" deve ser uma string, por exemplo: "3.10".'
+                
+                # Validação simples de formato X.Y ou X.Y.Z
+                if not re.match(r'^\d+\.\d+(\.\d+)?$', python_version):
+                    logging.info(f'Formato de versão Python inválido: "{python_version}".')
+                    return False, f'Formato de versão Python inválido: "{python_version}". Use X.Y ou X.Y.Z.'
 
 
         # Validação de Pacotes Fixos ('fixed')
@@ -125,8 +126,6 @@ class InputValidator:
                 logging.info('O campo "wants" não foi preenchido corretamente.')
                 return False, 'O campo "wants" deve ser uma lista de strings.'
             
-            logging.info(f'Validando "wants": {raw_wants_deps}')
-
             wants_normalized = []
             for item in raw_wants_deps:
 

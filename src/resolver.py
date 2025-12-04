@@ -61,16 +61,22 @@ class Resolver:
 
             solution = self._backtracking(assignments, constraints, todo_list)
 
-            return {
+            out = {
                 "status": "ok",
+                "python_version": self.gb.python_version,
                 "install_plan": self._format_solution(solution),
                 "stats": self.stats
             }
+
+            logging.info(f"{out}")
+
+            return out
         
         except ConflictError as e:
             logging.info(f"Conflito detectado: {str(e)}")
             return {
                 "status": "conflict",
+                "python_version": self.gb.python_version,
                 "message": str(e),
                 "debug_info": {
                     "package_causing_conflict": e.package,
@@ -90,14 +96,19 @@ class Resolver:
         
         # Se não há mais pacotes na lista 'todo', uma solução válida foi encontrada
         if not todo_list:
-            logging.info(f"Solução encontrada com {len(assignments)} pacotes após {self.stats['steps']} passos e {self.stats['backtracks']} backtracks.")
+            logging.info(f"Solução encontrada com {len(assignments)} pacote(s) após {self.stats['steps']} passos e {self.stats['backtracks']} backtracks.")
             return assignments
 
 
         # Escolha de qual pacote resolver agora
         package_to_solve = self._select_mrv_package(todo_list, constraints)
-        logging.info(f"Resolvendo '{package_to_solve}' com restrição '{constraints[package_to_solve]}'")
+        if constraints[package_to_solve] != SpecifierSet(""):
+            logging.info(f'Resolvendo "{package_to_solve}" com restrição "{constraints[package_to_solve]}".')
         
+        else:
+            logging.info(f'Resolvendo "{package_to_solve}" sem restrição específica.')
+
+
         # Remove o pacote escolhido da lista de pendências para a próxima iteração
         new_todo_list = [package for package in todo_list if package != package_to_solve]
 
@@ -110,9 +121,9 @@ class Resolver:
 
             self.stats["backtracks"] += 1
 
-            logging.info(f"Sem versões compatíveis para '{package_to_solve}' com a restrição '{required_spec}'")
+            logging.info(f'Sem versões compatíveis para "{package_to_solve}" com a restrição "{required_spec}".')
             raise ConflictError(
-                f"Sem versões compatíveis para '{package_to_solve}' com a restrição '{required_spec}'",
+                f'Sem versões compatíveis para "{package_to_solve}" com a restrição "{required_spec}".',
                 package=package_to_solve,
                 constraint=required_spec
             )
@@ -172,7 +183,7 @@ class Resolver:
                 
                 # Atualiza a lista de tarefas com as novas dependências descobertas
                 next_todo = new_todo_list + [package for package in new_todo_additions if package not in new_todo_list]
-                logging.info(f"Próxima lista de pacotes a resolver: {next_todo}")
+                logging.info(f"Próxima lista de pacotes a resolver: {next_todo}.")
 
                 return self._backtracking(new_assignments, new_constraints, next_todo)
 
@@ -185,7 +196,7 @@ class Resolver:
         self.stats["backtracks"] += 1
 
         raise ConflictError(
-            f"Falha ao resolver '{package_to_solve}'. Todas as {len(candidates)} versões falharam. Último erro: {last_error}",
+            f"Falha ao resolver '{package_to_solve}'. Todas as {len(candidates)} versões falharam. Último erro: {last_error}.",
             parent_error=last_error
         )
 
@@ -207,8 +218,12 @@ class Resolver:
 
             candidates = self.gb.get_candidate_versions(package, spec)
             count = len(candidates)
-            logging.info(f"Pacote '{package}' tem {count} candidatos com a restrição '{spec}'")
+            if spec != SpecifierSet(""):
+                logging.info(f'Pacote "{package}" tem {count} candidato(s) com a restrição "{spec}" e compatíveis com a versão Python {self.gb.python_version}.')
             
+            else:
+                logging.info(f'Pacote "{package}" tem {count} candidato(s) sem restrição específica e compatíveis com a versão Python {self.gb.python_version}.')
+
             # Se count é 0, já escolhe para falhar imediatamente (Fail-Fast)
             if count == 0:
                 return package
@@ -298,7 +313,5 @@ class Resolver:
                 "version": data['version'],
                 "yanked": data['is_yanked'],
             })
-
-            logging.info(f"Plano de instalação: {plan}")
 
         return plan

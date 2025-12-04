@@ -1,4 +1,5 @@
 import logging
+from functools import lru_cache
 from packaging.specifiers import SpecifierSet
 from packaging.requirements import Requirement
 from packaging.version import Version, InvalidVersion
@@ -30,6 +31,7 @@ class GraphBuilder:
 
 
 
+    @lru_cache(maxsize=None)
     def get_candidate_versions(self, package_name, specifier_set=None):
         """
         Busca versões disponíveis, aplica filtros (Python, Specifier) e ordenação heurística.
@@ -37,7 +39,7 @@ class GraphBuilder:
 
         # Busca versões
         raw_versions = self.db.get_available_versions(package_name)
-        logging.info(f'Versões brutas encontradas para o pacote "{package_name}": {raw_versions}')
+        logging.info(f'Versões iniciais encontradas para o pacote "{package_name}": {raw_versions}.')
         candidates = []
 
         if specifier_set is None:
@@ -49,16 +51,15 @@ class GraphBuilder:
                 version_obj = Version(version)
 
             except InvalidVersion:
-                logging.info(f"Versão inválida ignorada no banco: {version} do pacote {package_name}.")
+                logging.info(f'Versão inválida ignorada no banco: "{version}" do pacote "{package_name}".')
                 continue
 
             # Filtro: Specifier
             if not specifier_set.contains(version_obj, prereleases=True):
-                logging.info(f"Rejeitado: {version_obj} | É Prerelease? {version_obj.is_prerelease} | Spec: {specifier_set}")
+                logging.info(f'Versão rejeitada: {version_obj} | Spec: {specifier_set}.')
                 continue
 
             # Filtro: Compatibilidade com Python
-            # Se python_version for None, aceita qualquer versão do pacote
             if self.python_version:
                 if not self.db.python_version_satisfies_package(package_name, version, self.python_version):
                     logging.info(f'Versão Python do pacote "{package_name}" na versão "{version}" não é compatível com Python {self.python_version}.')
@@ -87,6 +88,7 @@ class GraphBuilder:
 
 
 
+    @lru_cache(maxsize=None)
     def get_dependencies(self, package_name, version):
         """
         Retorna as dependências de um pacote.
@@ -119,17 +121,16 @@ class GraphBuilder:
                             logging.info(f'Dependência rejeitada: "{raw_dep}". Motivo: Marcador "{req.marker}" falhou para o ambiente "{env_markers}".')
                             continue # Marcador falhou (ex: versão python incompatível), descarta
                     
-                    # CASO 2: Python indefinido (Modo Universal)
+                    # CASO 2: Python indefinido - ERRO
                     else:
-                        # Se não há a versão do Python definida, não é possível julgar marcadores de versão
-                        logging.info(f'Versão do Python não definida. Aceitando dependência "{raw_dep}" do pacote "{package_name}" na versão "{version}".')
-                        pass
+                        logging.info(f'ERRO: Versão do Python não definida. Não é possível avaliar dependência "{raw_dep}".')
+                        raise ValueError(f'Versão do Python não definida. Não é possível avaliar dependência "{raw_dep}".')
 
                 cleaned_deps.append((req.name.lower(), req.specifier))
 
             except Exception as e:
                 # Se falhar o parse, ignora a dependência por segurança
-                logging.error(f"ERRO DE PARSE: Não foi possível processar a dependência '{raw_dep}' do pacote '{package_name}'. Erro: '{e}'.")
+                logging.error(f'ERRO DE PARSE: Não foi possível processar a dependência "{raw_dep}" do pacote "{package_name}". Erro: "{e}".')
                 continue
 
         return cleaned_deps
