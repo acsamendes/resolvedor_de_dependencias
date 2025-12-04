@@ -12,6 +12,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copia o código fonte do projeto
 COPY . .
-
-# Comando padrão (pode ser sobrescrito pelo docker-compose)
-CMD ["python", "main.py"]

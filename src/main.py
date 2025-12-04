@@ -14,7 +14,7 @@ from resolver import Resolver
 
 
 
-DB_PATH = os.path.join("data", "pypi-data.sqlite")
+DB_PATH = os.path.join("..", "dados", "pypi-data.sqlite")
 
 # Singleton do Banco de Dados 
 _db_client: Optional[DBClient] = None

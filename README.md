@@ -16,7 +16,7 @@ O sistema utiliza dados reais do PyPI e resolve dependências usando as técnica
 
 Abaixo, o diagrama ilustra como o sistema processa uma requisição, desde a entrada do usuário até a resolução final das versões.
 
-![Fluxo de Execução](src/assets/fluxo.png)
+![Fluxo de Execução](arquivos_relacionados/fluxo.png)
 
 1.  **Entrada e Validação:**
     O `main.py` recebe a requisição (`POST /resolve`) e aciona o `InputValidator`. Ele normaliza os nomes (ex: "Pandas" vira "pandas") e verifica imediatamente no banco se os pacotes existem. Se não existirem, o processo para aqui (*Fail Fast*).
@@ -50,13 +50,13 @@ Para executar o projeto, você pode escolher entre utilizar uma base de dados pr
 Se deseja iniciar a aplicação rapidamente, baixe o dataset pré-processado:
 1. Faça o download do arquivo `.zip` através deste link: [LINK DO DRIVE](https://drive.google.com/drive/folders/1ZqvOu022HgDVcafCKbKbks3cJkBscttT?usp=sharing)
 2. Extraia o arquivo `.sqlite` contido no zip.
-3. Mova o arquivo extraído para a pasta `data` dentro do diretório do projeto.
+3. Mova o arquivo extraído para a pasta `dados` dentro do diretório do projeto.
    > **Atenção:** Mantenha exatamente o mesmo nome do arquivo `.sqlite` extraído.
 
 **Opção B: Configuração Completa (Via Script)**
 Caso opte por não baixar o arquivo `.zip`, a aplicação executará automaticamente um script de setup.
 * O sistema fará a busca e limpeza dos dados diretamente da fonte.
-* **Aviso:** Este processo leva em média **22 minutos** para ser concluído.
+* **Aviso:** Este processo leva em média **33 minutos** para ser concluído.
 
 
 ### 2. Executando a Aplicação
