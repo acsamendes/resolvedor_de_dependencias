@@ -1,5 +1,6 @@
 # --- Banco de Dados ---
 dados/
+../dados/
 pypi_data.sqlite
 *.sqlite
 *.sqlite3
