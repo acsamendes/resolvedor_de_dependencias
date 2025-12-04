@@ -42,71 +42,37 @@ Abaixo, o diagrama ilustra como o sistema processa uma requisição, desde a ent
 
 ## Passo a Passo de Execução
 
-Para executar o projeto, siga a ordem das etapas abaixo. O uso de um ambiente virtual é recomendado para evitar conflitos de bibliotecas no seu sistema operacional.
+Para executar o projeto, você pode escolher entre utilizar uma base de dados pré-processada (execução rápida) ou construir a base do zero. Siga as instruções abaixo:
 
-### 1\. Preparação do Ambiente Virtual
-
-Antes de iniciar, crie e ative um ambiente virtual isolado para o projeto acessando o seu terminal local.
-
-**No Windows:**
-
-```powershell
-# 1. Cria o ambiente virtual
-python -m venv venv
-
-# 2. Ativa o ambiente
-.\venv\Scripts\activate
-
-# 3. (Opcional) Se for rodar scripts locais, instale as dependências
-pip install -r requirements.txt
-```
-
-**No Linux / macOS:**
-
-```bash
-# 1. Cria o ambiente virtual
-python3 -m venv venv
-
-# 2. Ativa o ambiente
-source venv/bin/activate
-
-# 3. (Opcional) Se for rodar scripts locais, instale as dependências
-pip install -r requirements.txt
-```
-
------
-
-### 2\. Configuração da Base de Dados
-
-Você tem duas opções para preparar o banco de dados utilizado pelo resolvedor:
+### 1. Configuração da Base de Dados
 
 **Opção A: Execução Rápida (Recomendado)**
 Se deseja iniciar a aplicação rapidamente, baixe o dataset pré-processado:
+1. Faça o download do arquivo `.zip` através deste link: [LINK DO DRIVE](https://drive.google.com/drive/folders/1ZqvOu022HgDVcafCKbKbks3cJkBscttT?usp=sharing)
+2. Extraia o arquivo `.sqlite` contido no zip.
+3. Mova o arquivo extraído para a pasta `dados` dentro do diretório do projeto.
+   > **Atenção:** Mantenha exatamente o mesmo nome do arquivo `.sqlite` extraído.
 
-1.  Faça o download do arquivo `.zip` através deste link: [LINK DO DRIVE](https://drive.google.com/drive/folders/1ZqvOu022HgDVcafCKbKbks3cJkBscttT?usp=sharing)
-2.  Extraia o arquivo `.sqlite` contido no zip.
-3.  Mova o arquivo extraído para a pasta `dados` dentro do diretório do projeto.
-    > **Atenção:** Mantenha exatamente o mesmo nome do arquivo (`pypi-data.sqlite`).
+**Opção B: Configuração Completa (Via Script)**
+Caso opte por não baixar o arquivo `.zip`, a aplicação executará automaticamente um script de setup.
+* O sistema fará a busca e limpeza dos dados diretamente da fonte.
+* **Aviso:** Este processo leva em média **33 minutos** para ser concluído.
 
-**Opção B: Configuração Automática (Via Script)**
-Caso opte por não baixar o arquivo manualmente, a aplicação executará automaticamente um script de setup ao iniciar.
 
-  * O sistema fará o download, descompactação e limpeza dos dados diretamente da fonte oficial.
-  * **Aviso:** Este processo pode levar alguns minutos dependendo da sua velocidade de internet, pois envolve o download e processamento de um arquivo grande.
+### 2. Executando a Aplicação
 
------
+Certifique-se de que o **Docker Desktop** esteja instalado e em execução na sua máquina.
 
-### 3\. Executando a Aplicação
+1. No seu terminal (ambiente), execute o comando para construir e subir os containers:
+   ```bash
+   docker-compose up --build
 
-Certifique-se de que o **Docker Desktop** (ou Engine) esteja instalado e em execução na sua máquina.
+## Exemplo de execução
+### Input
+![Exemplo Input](arquivos_relacionados/Exemplo_input.jpeg)
 
-1.  No seu terminal (com o `venv` ativado ou não, pois o Docker isola a execução), rode o comando para construir e subir os containers:
-    ```bash
-    docker-compose up --build
-    ```
-2.  A aplicação estará disponível em `http://localhost:8000`.
-
------
+### Output
+![Exemplo Output](arquivos_relacionados/Exemplo_output.jpeg)
 
 ## Links úteis
 
@@ -115,5 +81,3 @@ Certifique-se de que o **Docker Desktop** (ou Engine) esteja instalado e em exec
   * [Tutorial sobre ambientes virtuais Python](https://docs.python.org/3/tutorial/venv.html)
 
 <!-- end list -->
-
-
