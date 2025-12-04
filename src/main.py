@@ -13,9 +13,9 @@ from graph_builder import GraphBuilder
 from resolver import Resolver
 
 
-
-
-DB_PATH = os.path.join("..", "dados", "pypi-data.sqlite")
+# --- CONFIGURAÇÕES ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "..", "dados", "pypi-data.sqlite")
 
 # Singleton do Banco de Dados 
 _db_client: Optional[DBClient] = None
