@@ -1,6 +1,7 @@
 import json
-import logging
 import os
+import time
+import logging
 import uvicorn
 from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Depends, Form
@@ -142,6 +143,9 @@ def resolve_dependencies(
 
     """
 
+    # Tempo de início de execução
+    start_time = time.time()
+
     # Validação do campo 'python'
     if not python or not python.strip():
         logging.error("O campo 'python' é obrigatório e não pode ser vazio.")
@@ -212,14 +216,31 @@ def resolve_dependencies(
         logging.info(f'Resolvendo para Python: {python}, alvos: {list(reqs_map.keys())}.')
         result = resolver.resolve(reqs_map)
 
+        # Tempo de término de execução
+        end_time = time.time()
+
+        # Cálculo da duração
+        duration = end_time - start_time
+
+        # Injeção do tempo no dicionário de resposta
+        result['total_time_seconds'] = round(duration, 4)
+
+        logging.info(f"Resolução concluída em {duration:.4f}s.")
+
         return result
 
     except Exception as e:
-        logging.error(f"Erro interno do servidor: {str(e)}")
+
+        # Tempo de término de execução
+        end_time = time.time()
+
+        # Cálculo da duração
+        duration = end_time - start_time
+
+        logging.error(f"Erro interno do servidor: {str(e)}. Tempo decorrido: {duration:.4f}s")
         import traceback
         logging.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Erro interno do servidor.")
-
+        raise HTTPException(status_code=500, detail=f"Erro interno do servidor. Tempo decorrido: {duration:.4f}s")
 
 
 

@@ -228,7 +228,11 @@ class Resolver:
             if count == 0:
                 return package
             
-            # Se count é 1, é uma escolha forçada, prioridade máxima.
+            # Se count é 1, é uma escolha forçada, prioridade máxima
+            if count == 1:
+                return package
+
+            # Varredura para encontrar a biblioteca com menor quantidade de candidatos
             if count < min_candidates:
                 min_candidates = count
                 best_pkg = package
