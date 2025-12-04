@@ -4,7 +4,8 @@ import sys
 import time
 import requests
 
-from resolvedor_de_dependencias.src.db_client import DBClient
+from db_client import DBClient
+
 
 # --- CONFIGURAÇÕES ---
 DB_URL = "https://github.com/pypi-data/pypi-json-data/releases/download/latest/pypi-data.sqlite.gz" 
@@ -25,6 +26,9 @@ DROP_COLUMNS = [
     'project_url',
     'plataform'
 ]
+
+
+
 
 def download_database(url, dest_path):
     """
@@ -60,6 +64,9 @@ def download_database(url, dest_path):
             os.remove(dest_path + ".tmp")
         sys.exit(1) # Encerra o programa pois não dá para continuar sem banco
 
+
+
+
 def get_connection():
     """
     Verifica se o banco existe. Se não, baixa. Retorna a conexão.
@@ -71,6 +78,8 @@ def get_connection():
     return client.get_connection()
 
 
+
+
 def get_table_columns(cursor, table_name):
     """Retorna uma lista com os nomes das colunas de uma tabela."""
     try:
@@ -78,6 +87,9 @@ def get_table_columns(cursor, table_name):
         return [row[1] for row in cursor.fetchall()]
     except sqlite3.OperationalError:
         return []
+
+
+
 
 def clean_database():
     print(f"Iniciando limpeza do banco: {DB_PATH}")

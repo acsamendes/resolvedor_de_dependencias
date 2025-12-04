@@ -1,7 +1,13 @@
-import sqlite3
 import json
+import sqlite3
+import logging
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version, InvalidVersion
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+
+
 
 class DBClient:
     def __init__(self, db_path):
@@ -11,6 +17,8 @@ class DBClient:
         """
         self.db_path = db_path
         self.table_name = "projects"
+
+
 
     def get_connection(self):
         """
@@ -23,6 +31,8 @@ class DBClient:
         conn.create_function("version_match", 2, self._sql_version_match)
         
         return conn
+
+
 
     @staticmethod
     def _sql_version_match(version, specifier):
@@ -38,31 +48,37 @@ class DBClient:
         try:
             v = Version(str(version))
             spec = SpecifierSet(str(specifier))
-            return 1 if v in spec else 0
+            return 1 if spec.contains(v, prereleases=True) else 0
         except (InvalidVersion, ValueError):
             return 0
+
+
 
     def get_available_versions(self, package):
         """
         Retorna todas as versões disponíveis para um pacote.
         """
-        query = f"SELECT version FROM {self.table_name} WHERE name = ?"
+        if not package: return []
+
+        query = f"SELECT version FROM {self.table_name} WHERE LOWER(name) = ?"
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, (package,))
+            cursor.execute(query, (package.lower(),))
             rows = cursor.fetchall()
             return [row['version'] for row in rows]
+
+
 
     def get_dependencies(self, package, version):
         """
         Retorna a lista de dependências (requires_dist) de um pacote específico.
         """
-        query = f"SELECT requires_dist FROM {self.table_name} WHERE name = ? AND version = ?"
+        query = f"SELECT requires_dist FROM {self.table_name} WHERE LOWER(name) = ? AND version = ?"
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, (package, version))
+            cursor.execute(query, (package.lower(), version))
             row = cursor.fetchone()
             
             if row and row['requires_dist']:
@@ -71,6 +87,8 @@ class DBClient:
                 except json.JSONDecodeError:
                     return [row['requires_dist']]
             return []
+
+
 
     def version_satisfies(self, version, specifier):
         """
@@ -82,8 +100,10 @@ class DBClient:
             spec = SpecifierSet(specifier)
             return v in spec
         except InvalidVersion:
-            print(f"Aviso: Versão inválida encontrada: {version}")
+            logging.warning(f"AVISO: Versão inválida encontrada: {version}")
             return False
+
+
 
     def package_and_version_exists(self, package, version):
         """
@@ -99,15 +119,17 @@ class DBClient:
         query = f"""
             SELECT 1 
             FROM {self.table_name} 
-            WHERE name = ? 
+            WHERE LOWER(name) = ? 
             AND version_match(version, ?) 
             LIMIT 1
         """
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, (package, version))
+            cursor.execute(query, (package.lower(), version))
             return cursor.fetchone() is not None
+
+
 
     def python_version_satisfies_package(self, package, version, python_version):
         """
@@ -123,13 +145,13 @@ class DBClient:
                     ELSE version_match(?, requires_python) 
                 END as is_compatible
             FROM {self.table_name} 
-            WHERE name = ? AND version = ?
+            WHERE LOWER(name) = ?  AND version = ?
         """
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
             # Note a ordem dos parâmetros: python_version primeiro (para o version_match), depois name e version
-            cursor.execute(query, (python_version, package, version))
+            cursor.execute(query, (python_version, package.lower(), version))
             row = cursor.fetchone()
             
             # Mantendo a lógica original: 
@@ -139,30 +161,29 @@ class DBClient:
             
             # Retorna o resultado booleano calculado pelo SQLite (0 ou 1)
             return bool(row['is_compatible'])
-    
+        
+
     def is_yanked(self, package, version):
         """
-        Verifica se uma versão específica de um pacote foi 'yanked' (marcada como descontinuada/removida).
+        Verifica se uma versão específica de um pacote foi marcada como 'yanked' (descontinuada/removida).
         
         Args:
             package: Nome do pacote.
-            version: Versão EXATA (string, ex: "1.2.0"). Não use specifiers aqui.
-        :return: True se foi yanked, False caso contrário (ou se o pacote não existir).
+            version: Versão exata do pacote.
+            
+        Returns:
+            bool: True se o pacote estiver marcado como yanked, False caso contrário.
         """
-        # Verifica a coluna 'yanked'. 
-        # Se sua coluna tiver outro nome (ex: 'yanked_reason'), ajuste a query abaixo.
-        query = f"SELECT yanked FROM {self.table_name} WHERE name = ? AND version = ?"
+        # A query seleciona a coluna 'yanked' baseada no nome e versão exata
+        query = f"SELECT yanked FROM {self.table_name} WHERE LOWER(name) = ?  AND version = ?"
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, (package, version))
+            cursor.execute(query, (package.lower(), version))
             row = cursor.fetchone()
             
-            if row:
-                val = row['yanked']
+            # Se o registro existe e a coluna yanked é verdadeira (1, True, ou string não vazia)
+            if row and row['yanked']:
+                return True
                 
-                if val:
-                    return bool(val)
-                else:
-                    # Se o pacote/versão não existe
-                    return False
+            return False

@@ -1,6 +1,5 @@
 import logging
 from packaging.specifiers import SpecifierSet
-from packaging.utils import canonicalize_name
 from packaging.requirements import Requirement
 from packaging.version import Version, InvalidVersion
 
@@ -38,6 +37,7 @@ class GraphBuilder:
 
         # Busca versões
         raw_versions = self.db.get_available_versions(package_name)
+        logging.info(f'Versões brutas encontradas para o pacote "{package_name}": {raw_versions}')
         candidates = []
 
         if specifier_set is None:
@@ -68,7 +68,7 @@ class GraphBuilder:
             is_yanked = self.db.is_yanked(package_name, version)
 
             candidate = {
-                'package': package_name,
+                'package': package_name.lower(),
                 'version_obj': version_obj,
                 'version': version,
                 'is_yanked': bool(is_yanked),
@@ -125,7 +125,7 @@ class GraphBuilder:
                         logging.info(f'Versão do Python não definida. Aceitando dependência "{raw_dep}" do pacote "{package_name}" na versão "{version}".')
                         pass
 
-                cleaned_deps.append((canonicalize_name(req.name), req.specifier))
+                cleaned_deps.append((req.name.lower(), req.specifier))
 
             except Exception as e:
                 # Se falhar o parse, ignora a dependência por segurança

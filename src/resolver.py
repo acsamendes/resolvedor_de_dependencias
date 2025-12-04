@@ -1,6 +1,5 @@
 import logging
 from packaging.specifiers import SpecifierSet
-from packaging.utils import canonicalize_name
     
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
@@ -46,8 +45,8 @@ class Resolver:
 
         self.stats = {"steps": 0, "backtracks": 0}
         
-        # Normaliza nomes de pacotes (boa prática em Python: 'Flask' == 'flask')
-        normalized_reqs = {canonicalize_name(k): v for k, v in requirements_map.items()}
+        # Normaliza nomes de pacotes para minúsculas
+        normalized_reqs = {k.lower(): v for k, v in requirements_map.items()}
         
         # Estado Inicial
         assignments = {}
@@ -69,7 +68,7 @@ class Resolver:
             }
         
         except ConflictError as e:
-
+            logging.info(f"Conflito detectado: {str(e)}")
             return {
                 "status": "conflict",
                 "message": str(e),
@@ -111,6 +110,7 @@ class Resolver:
 
             self.stats["backtracks"] += 1
 
+            logging.info(f"Sem versões compatíveis para '{package_to_solve}' com a restrição '{required_spec}'")
             raise ConflictError(
                 f"Sem versões compatíveis para '{package_to_solve}' com a restrição '{required_spec}'",
                 package=package_to_solve,
@@ -121,18 +121,19 @@ class Resolver:
         
         for candidate in candidates:
 
-            version_str = candidate['version_str']
+            version = candidate['version']
             
             try:
                 # Busca de dependências do candidato
-                dependencies = self.gb.get_dependencies(package_to_solve, version_str)
+                dependencies = self.gb.get_dependencies(package_to_solve, version)
+                logging.info(f'Dependências de {package_to_solve} {version}: {dependencies}')
 
                 # Verificação de Compatibilidade com decisões anteriores já tomadas
                 new_constraints = constraints.copy()
                 new_todo_additions = []
                 
                 for dependency_name, dependency_specifier in dependencies:
-                    dependency_name = canonicalize_name(dependency_name)
+                    dependency_name = dependency_name.lower()
                     new_spec = SpecifierSet(dependency_specifier)
                     
                     # Checagem se o pacote dependente já foi instalado com versão incompatível
@@ -142,8 +143,9 @@ class Resolver:
 
                         if not new_spec.contains(assigned_ver, prereleases=True):
 
+                            logging.info(f"Conflito: {package_to_solve} {version} requer {dependency_name}{new_spec}, mas {dependency_name} já foi fixado em {assigned_ver}.")
                             raise ConflictError(
-                                f"Conflito: {package_to_solve} {version_str} requer {dependency_name}{new_spec}, mas {dependency_name} já foi fixado em {assigned_ver}."
+                                f"Conflito: {package_to_solve} {version} requer {dependency_name}{new_spec}, mas {dependency_name} já foi fixado em {assigned_ver}."
                             )
                     
                     # Merge de restrições
@@ -170,7 +172,8 @@ class Resolver:
                 
                 # Atualiza a lista de tarefas com as novas dependências descobertas
                 next_todo = new_todo_list + [package for package in new_todo_additions if package not in new_todo_list]
-                
+                logging.info(f"Próxima lista de pacotes a resolver: {next_todo}")
+
                 return self._backtracking(new_assignments, new_constraints, next_todo)
 
             except ConflictError as e:
@@ -204,6 +207,7 @@ class Resolver:
 
             candidates = self.gb.get_candidate_versions(package, spec)
             count = len(candidates)
+            logging.info(f"Pacote '{package}' tem {count} candidatos com a restrição '{spec}'")
             
             # Se count é 0, já escolhe para falhar imediatamente (Fail-Fast)
             if count == 0:
@@ -229,14 +233,14 @@ class Resolver:
         
         for package, data in assignments.items():
 
-            version_str = data['version_str']
+            version = data['version']
 
             # Re-consulta as dependências da versão ESCOLHIDA
-            deps = self.gb.get_dependencies(package, version_str)
+            deps = self.gb.get_dependencies(package, version)
             
             for dependency_name, _ in deps:
 
-                dependency_name = canonicalize_name(dependency_name)
+                dependency_name = dependency_name.lower()
 
                 # A dependência só entra no grafo se ela faz parte da solução 
                 if dependency_name in graph:
@@ -291,8 +295,10 @@ class Resolver:
 
             plan.append({
                 "package": package_name,
-                "version": data['version_str'],
+                "version": data['version'],
                 "yanked": data['is_yanked'],
             })
+
+            logging.info(f"Plano de instalação: {plan}")
 
         return plan

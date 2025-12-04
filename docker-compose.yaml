@@ -13,4 +13,4 @@ services:
       # e garante que o arquivo .sqlite persista no disco local.
       - .:/app
 
-    command: sh -c "python setup.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "uvicorn main:app --host 0.0.0.0 --port 8000 --reload"

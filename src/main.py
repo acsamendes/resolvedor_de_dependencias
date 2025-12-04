@@ -72,6 +72,7 @@ def get_db() -> DBClient:
     """
 
     if _db_client is None:
+        logging.error("Serviço de banco de dados não inicializado.")
         raise HTTPException(status_code=500, detail="Serviço de banco de dados não inicializado.")
     
     return _db_client
@@ -117,9 +118,9 @@ def read_root():
 @app.post("/resolve")
 def resolve_dependencies(
         # Parâmetros definidos como Form aparecem como caixas de texto no Swagger
-        python: Optional[str] = Form("3.10", description="Versão do Python."),
-        wants: Optional[List[str]] = Form(None, description="Lista de pacotes desejados. Ex: flask"),
-        fixed: Optional[str] = Form(None, description='JSON contendo os pacotes e versões fixas. Ex: {"numpy": ">=1.0"}'),
+        python: Optional[str] = Form('"3.10"', description="Versão do Python."),
+        wants: Optional[List[str]] = Form('["mcp"]', description='Lista de pacotes desejados. Ex: "mcp"'),
+        fixed: Optional[str] = Form('{"numpy": ">=1.0"}', description='JSON contendo os pacotes e versões fixas. Ex: {"numpy": ">=1.0"}'),
         max_versions: int = Form(10, description="Limite de versões por pacote durante as buscas."),
         db_client: DBClient = Depends(get_db)):
     """
@@ -137,6 +138,7 @@ def resolve_dependencies(
                 raise ValueError
             
         except (json.JSONDecodeError, ValueError):
+            logging.error("Erro ao processar o campo 'fixed'.")
             raise HTTPException(status_code=400, detail='O campo "fixed" deve ser um JSON válido (ex: {"pkg": "==1.0"}).')
     
 
@@ -147,10 +149,10 @@ def resolve_dependencies(
         for item in wants:
             # Se o item contiver vírgula, quebra ele. Se não, mantém.
             if "," in item:
-                final_wants.extend([x.strip() for x in item.split(",")])
-            else:
+                parts = [x.strip() for x in item.split(",") if x.strip()]
+                final_wants.extend(parts)
+            elif item.strip():
                 final_wants.append(item.strip())
-    
     
     # Montagem do JSON 
     input_data = {
@@ -159,6 +161,8 @@ def resolve_dependencies(
         "wants": final_wants if final_wants else [],
         "max_versions": max_versions
     }
+
+    logging.info(f'Requisição recebida: {input_data}')
 
     validator = InputValidator(db_client)
     is_valid, error_msg = validator.validate(input_data)
@@ -183,9 +187,10 @@ def resolve_dependencies(
         return result
 
     except Exception as e:
+        logging.error(f"Erro interno do servidor: {str(e)}")
         import traceback
-        traceback.logging.info_exc()
-        raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Erro interno do servidor.")
 
 
 

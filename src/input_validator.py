@@ -1,6 +1,5 @@
 import re
 import logging
-from packaging.utils import canonicalize_name
 from packaging.specifiers import SpecifierSet, InvalidSpecifier
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -31,6 +30,8 @@ class InputValidator:
             tuple: (is_valid (bool), error_message (str ou None))
         """
         
+        logging.info('Iniciando validação das entradas.')
+
         # Validação Estrutural Básica
         if not isinstance(input_data, dict):
             logging.info('Ocorreu um erro na validação das entradas.')
@@ -48,8 +49,8 @@ class InputValidator:
         # Verificação de segurança e normalização de nomes
         if 'fixed' in input_data and 'wants' in input_data:
             # Normaliza as chaves 
-            fixed_keys = {canonicalize_name(k) for k in input_data['fixed'].keys()}
-            wants_set = {canonicalize_name(k) for k in input_data['wants']}
+            fixed_keys = {k.lower() for k in input_data['fixed'].keys()}
+            wants_set = {k.lower() for k in input_data['wants']}
 
             intersection = fixed_keys.intersection(wants_set)
 
@@ -60,6 +61,8 @@ class InputValidator:
 
         # Validação da Versão do Python
         if 'python' in input_data:
+
+            logging.info('Validando versão do Python.')
 
             python_version = input_data['python']
 
@@ -76,16 +79,18 @@ class InputValidator:
         # Validação de Pacotes Fixos ('fixed')
         if 'fixed' in input_data:
 
+            logging.info('Validando pacotes fixos em "fixed".')
+
             raw_fixed_deps = input_data['fixed']
 
             if not isinstance(raw_fixed_deps, dict):
                 logging.info('O campo "fixed" não foi preenchido corretamente.')
                 return False, 'O campo "fixed" deve ser um dicionário {"pacote": "versão"}.'
 
-            fixed_deps = {}
+            fixed_deps_normalized = {}
             for package, version_spec in raw_fixed_deps.items():
 
-                norm_name = canonicalize_name(package)
+                norm_name = package.lower()
 
                 # Valida nome do pacote
                 if not self._is_valid_package_name(norm_name):
@@ -97,14 +102,22 @@ class InputValidator:
                     logging.info(f'Especificador de versão inválido para "{package}": "{version_spec}".')
                     return False, f'Especificador de versão inválido para "{package}": "{version_spec}".'
 
+                logging.info(f'Verificando existência do pacote "{package}" com a versão/restrição "{version_spec}" no banco de dados.')
+
                 # Valida existência no DB passando o nome e a versão/restrição
                 if not self.db_client.package_and_version_exists(norm_name, version_spec):
                     logging.info(f'O pacote "{package}" com a versão/restrição "{version_spec}" não foi encontrado ou não é válido no banco de dados.')
                     return False, f'O pacote "{package}" com a versão/restrição "{version_spec}" não foi encontrado ou não é válido no banco de dados.'
 
+                fixed_deps_normalized[norm_name] = version_spec
+
+            input_data['fixed'] = fixed_deps_normalized
+                
 
         # Validação de Pacotes Desejados ('wants')
         if 'wants' in input_data:
+
+            logging.info('Validando pacotes desejados em "wants".')
 
             raw_wants_deps = input_data['wants']
 
@@ -112,23 +125,28 @@ class InputValidator:
                 logging.info('O campo "wants" não foi preenchido corretamente.')
                 return False, 'O campo "wants" deve ser uma lista de strings.'
             
-            logging.info(f'Validating wants: {raw_wants_deps}')
+            logging.info(f'Validando "wants": {raw_wants_deps}')
 
+            wants_normalized = []
             for item in raw_wants_deps:
 
                 if not isinstance(item, str):
                     logging.info('Itens inválidos encontrados em "wants".')
                     return False, 'Os itens em "wants" devem ser nomes de pacotes (strings).'
 
-                package_name = item
-                
-                if not self._is_valid_package_name(package_name):
-                    logging.info(f'Nome de pacote inválido em "wants": "{package_name}".')
-                    return False, f'Nome de pacote inválido em "wants": "{package_name}".'
+                norm_name = item.lower()
 
-                if not self.db_client.package_and_version_exists(package_name, None):
-                    logging.info(f'O pacote "{package_name}" listado em "wants" não foi encontrado no banco de dados.')
-                    return False, f'O pacote "{package_name}" listado em "wants" não foi encontrado no banco de dados.'
+                if not self._is_valid_package_name(norm_name):
+                    logging.info(f'Nome de pacote inválido em "wants": "{item}".')
+                    return False, f'Nome de pacote inválido em "wants": "{item}".'
+
+                if not self.db_client.package_and_version_exists(norm_name, None):
+                    logging.info(f'O pacote "{item}" listado em "wants" não foi encontrado no banco de dados.')
+                    return False, f'O pacote "{item}" listado em "wants" não foi encontrado no banco de dados.'
+
+                wants_normalized.append(norm_name)
+
+            input_data['wants'] = wants_normalized
 
         return True, None
 
